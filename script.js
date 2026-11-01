@@ -1,20 +1,48 @@
 // ===== Výběr DOM prvků =====
 const $ = (id) => document.getElementById(id);
 
+// Obrazovky
+const views = {
+  home: $('viewHome'),
+  timer: $('viewTimer'),
+  editor: $('viewEditor'),
+  settings: $('viewSettings'),
+};
+
+// Seznam tréninků
+const presetList = $('presetList');
+const emptyState = $('emptyState');
+const addPresetBtn = $('addPreset');
+const openSettingsBtn = $('openSettings');
+
+// Minutka
 const circle = $('progressCircle');
 const timeDisplay = $('timeDisplay');
 const phaseLabel = $('phaseLabel');
 const roundDisplay = $('roundDisplay');
-
+const timerTitle = $('timerTitle');
 const startBtn = $('startBtn');
 const resetBtn = $('resetBtn');
+const backFromTimerBtn = $('backFromTimer');
 
+// Editor tréninku
+const editorTitle = $('editorTitle');
+const nameInput = $('presetName');
 const workMinInput = $('workMin');
 const workSecInput = $('workSec');
 const restMinInput = $('restMin');
 const restSecInput = $('restSec');
 const roundsInput = $('rounds');
+const editorTotal = $('editorTotal');
+const editorBar = $('editorBar');
+const savePresetBtn = $('savePreset');
+const cancelEditBtn = $('cancelEdit');
+const backFromEditorBtn = $('backFromEditor');
+const deletePresetBtn = $('deletePreset');
+const duplicatePresetBtn = $('duplicatePreset');
 
+// Hlas a zvuk
+const backFromSettingsBtn = $('backFromSettings');
 const voiceEnabledInput = $('voiceEnabled');
 const voiceOptions = $('voiceOptions');
 const voiceLangSelect = $('voiceLang');
@@ -45,6 +73,11 @@ let workDuration = 120;   // v sekundách
 let restDuration = 30;
 let totalPhaseTime = 120;
 let timeRemaining = 120;
+
+let presets = [];
+let activePresetId = null;
+let editingId = null;     // null = nový trénink
+let savedVoiceURI = '';
 
 // ===== Zvuk – jeden sdílený AudioContext =====
 // (nový kontext pro každé pípnutí iOS po pár kusech zablokuje)
@@ -215,7 +248,6 @@ function leftText(sec) {
 
 // ===== Syntéza řeči =====
 let voices = [];
-let savedVoiceURI = '';
 let speechUnlocked = false;
 
 function voicesForLang(code) {
@@ -367,15 +399,12 @@ function formatTime(seconds) {
   return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 }
 
+// Načte délky z vybraného tréninku
 function loadSettings() {
-  const wMin = parseInt(workMinInput.value) || 0;
-  const wSec = parseInt(workSecInput.value) || 0;
-  const rMin = parseInt(restMinInput.value) || 0;
-  const rSec = parseInt(restSecInput.value) || 0;
-
-  workDuration = Math.max(1, wMin * 60 + wSec);
-  restDuration = Math.max(0, rMin * 60 + rSec);
-  totalRounds = Math.max(1, parseInt(roundsInput.value) || 1);
+  const p = activePreset() || { work: 120, rest: 30, rounds: 3 };
+  workDuration = Math.max(1, p.work);
+  restDuration = Math.max(0, p.rest);
+  totalRounds = Math.max(1, p.rounds);
 }
 
 function setPhaseLabel(text, kind) {
@@ -513,25 +542,225 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && isRunning) requestWakeLock();
 });
 
-// ===== Ukládání nastavení =====
-const STORAGE_KEY = 'minutka-nastaveni';
+// ===== Tréninky (varianty) =====
+const PRESETS_KEY = 'minutka-treninky';
+const SETTINGS_KEY = 'minutka-nastaveni';
+
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const activePreset = () => presets.find((p) => p.id === activePresetId);
+
+function defaultPresets() {
+  // Převezme časy z původní verze aplikace, pokud nějaké byly uložené
+  let mine = { work: 120, rest: 30, rounds: 3 };
+  try {
+    const old = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+    if ('workMin' in old) {
+      mine = {
+        work: Math.max(1, (+old.workMin || 0) * 60 + (+old.workSec || 0)),
+        rest: Math.max(0, (+old.restMin || 0) * 60 + (+old.restSec || 0)),
+        rounds: Math.max(1, +old.rounds || 1),
+      };
+    }
+  } catch (e) { /* nevadí */ }
+
+  return [
+    { id: uid(), name: 'Moje minutka', ...mine },
+    { id: uid(), name: 'Tabata', work: 20, rest: 10, rounds: 8 },
+    { id: uid(), name: 'EMOM 10 minut', work: 60, rest: 0, rounds: 10 },
+  ];
+}
+
+function loadPresets() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(PRESETS_KEY));
+    if (Array.isArray(stored)) { presets = stored; return; }
+  } catch (e) { /* nevadí */ }
+  presets = defaultPresets();
+  savePresets();
+}
+
+function savePresets() {
+  try { localStorage.setItem(PRESETS_KEY, JSON.stringify(presets)); } catch (e) { /* nevadí */ }
+}
+
+// ===== Formátování pro seznam =====
+const totalTime = (p) => p.rounds * p.work + (p.rounds - 1) * p.rest;
+
+function shortDur(sec) {
+  if (sec < 60) return `${sec} s`;
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return s ? `${m}:${String(s).padStart(2, '0')} min` : `${m} min`;
+}
+
+function roundsWord(n) {
+  return n === 1 ? 'kolo' : n >= 2 && n <= 4 ? 'kola' : 'kol';
+}
+
+function presetMeta(p) {
+  const parts = [`${shortDur(p.work)} práce`];
+  if (p.rest) parts.push(`${shortDur(p.rest)} pauza`);
+  parts.push(`${p.rounds} ${roundsWord(p.rounds)}`);
+  return parts.join(', ');
+}
+
+// Proužek se strukturou tréninku: červená = práce, zelená = pauza
+function renderBar(container, p) {
+  container.innerHTML = '';
+  const rounds = Math.min(p.rounds, 24);
+  for (let r = 0; r < rounds; r++) {
+    const w = document.createElement('i');
+    w.className = 'bar-work';
+    w.style.flexGrow = p.work;
+    container.append(w);
+    if (p.rest && r < rounds - 1) {
+      const re = document.createElement('i');
+      re.className = 'bar-rest';
+      re.style.flexGrow = p.rest;
+      container.append(re);
+    }
+  }
+}
+
+const ICON_EDIT = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
+
+function renderPresetList() {
+  presetList.innerHTML = '';
+  emptyState.hidden = presets.length > 0;
+
+  presets.forEach((p) => {
+    const li = document.createElement('li');
+    li.className = 'preset';
+    li.innerHTML = `
+      <button class="preset-main" type="button">
+        <span class="preset-text">
+          <span class="preset-name"></span>
+          <span class="preset-meta"></span>
+          <span class="preset-bar"></span>
+        </span>
+        <span class="preset-total"></span>
+      </button>
+      <button class="preset-edit" type="button">${ICON_EDIT}</button>`;
+
+    li.querySelector('.preset-name').textContent = p.name;
+    li.querySelector('.preset-meta').textContent = presetMeta(p);
+    li.querySelector('.preset-total').textContent = formatTime(totalTime(p));
+    renderBar(li.querySelector('.preset-bar'), p);
+
+    const editBtn = li.querySelector('.preset-edit');
+    editBtn.setAttribute('aria-label', `Upravit ${p.name}`);
+    editBtn.addEventListener('click', () => openEditor(p.id));
+    li.querySelector('.preset-main').addEventListener('click', () => openTimer(p.id));
+
+    presetList.append(li);
+  });
+}
+
+// ===== Přepínání obrazovek =====
+function showView(name) {
+  Object.entries(views).forEach(([key, el]) => { el.hidden = key !== name; });
+  window.scrollTo(0, 0);
+}
+
+function goHome() {
+  renderPresetList();
+  showView('home');
+}
+
+function openTimer(id) {
+  activePresetId = id;
+  timerTitle.textContent = activePreset().name;
+  resetTimer();
+  showView('timer');
+}
+
+function leaveTimer() {
+  if (hasStarted && !confirm('Ukončit rozběhnutý trénink?')) return;
+  resetTimer();
+  goHome();
+}
+
+// ===== Editor tréninku =====
+function readEditor() {
+  const num = (el) => Math.max(0, parseInt(el.value) || 0);
+  return {
+    name: nameInput.value.trim() || 'Trénink',
+    work: Math.max(1, num(workMinInput) * 60 + Math.min(59, num(workSecInput))),
+    rest: num(restMinInput) * 60 + Math.min(59, num(restSecInput)),
+    rounds: Math.max(1, num(roundsInput)),
+  };
+}
+
+function updateEditorPreview() {
+  const p = readEditor();
+  editorTotal.textContent = `Celkem ${formatTime(totalTime(p))}`;
+  renderBar(editorBar, p);
+}
+
+function openEditor(id = null) {
+  editingId = id;
+  const p = presets.find((x) => x.id === id) || { name: '', work: 60, rest: 30, rounds: 5 };
+
+  editorTitle.textContent = id ? 'Upravit trénink' : 'Nový trénink';
+  nameInput.value = p.name;
+  workMinInput.value = Math.floor(p.work / 60);
+  workSecInput.value = p.work % 60;
+  restMinInput.value = Math.floor(p.rest / 60);
+  restSecInput.value = p.rest % 60;
+  roundsInput.value = p.rounds;
+
+  deletePresetBtn.hidden = !id;
+  duplicatePresetBtn.hidden = !id;
+  updateEditorPreview();
+  showView('editor');
+  if (!id) nameInput.focus();
+}
+
+function saveEditor() {
+  const data = readEditor();
+  if (editingId) {
+    Object.assign(presets.find((x) => x.id === editingId), data);
+  } else {
+    presets.push({ id: uid(), ...data });
+  }
+  savePresets();
+  goHome();
+}
+
+function deleteEditing() {
+  const p = presets.find((x) => x.id === editingId);
+  if (!p || !confirm(`Smazat trénink „${p.name}“?`)) return;
+  presets = presets.filter((x) => x.id !== editingId);
+  savePresets();
+  goHome();
+}
+
+function duplicateEditing() {
+  const p = presets.find((x) => x.id === editingId);
+  if (!p) return;
+  const copy = { ...readEditor(), id: uid(), name: `${p.name} (kopie)` };
+  presets.splice(presets.indexOf(p) + 1, 0, copy);
+  savePresets();
+  openEditor(copy.id);
+}
+
+// ===== Ukládání nastavení hlasu =====
 const persistedInputs = [
-  workMinInput, workSecInput, restMinInput, restSecInput, roundsInput,
   voiceEnabledInput, voiceLangSelect, announceModeSelect, finalLenSelect, finalStyleSelect,
 ];
 
 function saveSettings() {
   try {
-    const data = {};
+    const data = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
     persistedInputs.forEach((el) => { data[el.id] = el.type === 'checkbox' ? el.checked : el.value; });
     data.voiceName = voiceNameSelect.value;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(data));
   } catch (e) { /* nevadí */ }
 }
 
 function restoreSettings() {
   try {
-    const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    const data = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
     persistedInputs.forEach((el) => {
       if (!(el.id in data)) return;
       if (el.type === 'checkbox') el.checked = data[el.id];
@@ -557,7 +786,7 @@ startBtn.addEventListener('click', () => {
   }
 
   const fresh = !hasStarted;
-  if (fresh) resetTimer(); // načte aktuální nastavení (i po „Hotovo")
+  if (fresh) resetTimer(); // i po „Hotovo" začne znovu od začátku
 
   isRunning = true;
   hasStarted = true;
@@ -570,16 +799,22 @@ startBtn.addEventListener('click', () => {
 });
 
 resetBtn.addEventListener('click', resetTimer);
+backFromTimerBtn.addEventListener('click', leaveTimer);
 
-// Změna časů → reset (pokud zrovna neběží)
-[workMinInput, workSecInput, restMinInput, restSecInput, roundsInput].forEach((input) => {
-  input.addEventListener('change', () => {
-    saveSettings();
-    if (!isRunning) resetTimer();
-  });
+addPresetBtn.addEventListener('click', () => openEditor(null));
+savePresetBtn.addEventListener('click', saveEditor);
+cancelEditBtn.addEventListener('click', goHome);
+backFromEditorBtn.addEventListener('click', goHome);
+deletePresetBtn.addEventListener('click', deleteEditing);
+duplicatePresetBtn.addEventListener('click', duplicateEditing);
+[nameInput, workMinInput, workSecInput, restMinInput, restSecInput, roundsInput].forEach((el) => {
+  el.addEventListener('input', updateEditorPreview);
 });
+nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') saveEditor(); });
 
-// Hlasová nastavení se dají měnit i za běhu
+openSettingsBtn.addEventListener('click', () => showView('settings'));
+backFromSettingsBtn.addEventListener('click', goHome);
+
 voiceEnabledInput.addEventListener('change', () => {
   voiceOptions.hidden = !voiceEnabledInput.checked;
   if (!voiceEnabledInput.checked && 'speechSynthesis' in window) speechSynthesis.cancel();
@@ -613,4 +848,5 @@ restoreSettings();
 voiceOptions.hidden = !voiceEnabledInput.checked;
 populateVoiceSelect();
 updateModeHint();
-resetTimer();
+loadPresets();
+goHome();

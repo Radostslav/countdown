@@ -3,11 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Workshop & Cvičební Minutka</title>
+  <title>Minutka</title>
 
   <!-- Podpora pro iOS Safari jako PWA (Web App) -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Minutka">
+  <meta name="theme-color" content="#0f172a">
 
   <link rel="stylesheet" href="style.css">
 </head>
@@ -15,53 +17,106 @@
 
   <div class="app-container">
 
-    <!-- Vizuální Časovač (Kruh s ubývající výsečí) -->
-    <div class="timer-display">
-      <svg class="progress-ring" viewBox="0 0 100 100">
-        <circle class="progress-ring__background" cx="50" cy="50" r="45" />
-        <circle class="progress-ring__circle" id="progressCircle" cx="50" cy="50" r="45" />
-      </svg>
+    <!-- ===== Úvod: seznam tréninků ===== -->
+    <section id="viewHome" class="view">
+      <header class="view-header">
+        <h1>Tréninky</h1>
+        <button id="openSettings" class="icon-btn" type="button" aria-label="Hlas a zvuk">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/></svg>
+        </button>
+      </header>
 
-      <div class="timer-text-container">
-        <span id="phaseLabel" class="phase-label">PŘIPRAVENO</span>
-        <span id="timeDisplay" class="time-display">02:00</span>
-        <span id="roundDisplay" class="round-display">Kolo 1 / 3</span>
-      </div>
-    </div>
+      <ul id="presetList" class="preset-list"></ul>
+      <p id="emptyState" class="empty" hidden>Zatím tu nemáš žádný trénink. Přidej první.</p>
 
-    <!-- Ovládací tlačítka -->
-    <div class="controls">
-      <button id="startBtn" class="btn btn-primary">Start</button>
-      <button id="resetBtn" class="btn btn-secondary">Reset</button>
-    </div>
+      <button id="addPreset" class="btn btn-add" type="button">+ Nový trénink</button>
+    </section>
 
-    <!-- Nastavení parametrů -->
-    <div class="settings-card">
-      <h2>Nastavení</h2>
+    <!-- ===== Minutka ===== -->
+    <section id="viewTimer" class="view view-timer" hidden>
+      <header class="view-header">
+        <button id="backFromTimer" class="back-btn" type="button">‹ Tréninky</button>
+        <h1 id="timerTitle" class="title-small"></h1>
+      </header>
 
-      <div class="setting-item">
-        <label for="workMin">Aktivita / Práce (min:sek)</label>
-        <div class="time-inputs">
-          <input type="number" id="workMin" value="2" min="0" max="99" inputmode="numeric"> m
-          <input type="number" id="workSec" value="0" min="0" max="59" inputmode="numeric"> s
+      <div class="timer-display">
+        <svg class="progress-ring" viewBox="0 0 100 100">
+          <circle class="progress-ring__background" cx="50" cy="50" r="45" />
+          <circle class="progress-ring__circle" id="progressCircle" cx="50" cy="50" r="45" />
+        </svg>
+
+        <div class="timer-text-container">
+          <span id="phaseLabel" class="phase-label">PŘIPRAVENO</span>
+          <span id="timeDisplay" class="time-display">02:00</span>
+          <span id="roundDisplay" class="round-display">Kolo 1 / 3</span>
         </div>
       </div>
 
-      <div class="setting-item">
-        <label for="restMin">Pauza / Mezera (min:sek)</label>
-        <div class="time-inputs">
-          <input type="number" id="restMin" value="0" min="0" max="99" inputmode="numeric"> m
-          <input type="number" id="restSec" value="30" min="0" max="59" inputmode="numeric"> s
+      <div class="controls">
+        <button id="startBtn" class="btn btn-primary" type="button">Start</button>
+        <button id="resetBtn" class="btn btn-secondary" type="button">Reset</button>
+      </div>
+    </section>
+
+    <!-- ===== Editor tréninku ===== -->
+    <section id="viewEditor" class="view" hidden>
+      <header class="view-header">
+        <button id="backFromEditor" class="back-btn" type="button">‹ Zpět</button>
+        <h1 id="editorTitle" class="title-small">Nový trénink</h1>
+      </header>
+
+      <div class="settings-card">
+        <div class="setting-item stacked">
+          <label for="presetName">Název</label>
+          <input type="text" id="presetName" placeholder="Např. Kliky a dřepy" maxlength="40" autocomplete="off">
+        </div>
+
+        <div class="setting-item">
+          <label for="workMin">Práce</label>
+          <div class="time-inputs">
+            <input type="number" id="workMin" min="0" max="99" inputmode="numeric"> m
+            <input type="number" id="workSec" min="0" max="59" inputmode="numeric"> s
+          </div>
+        </div>
+
+        <div class="setting-item">
+          <label for="restMin">Pauza</label>
+          <div class="time-inputs">
+            <input type="number" id="restMin" min="0" max="99" inputmode="numeric"> m
+            <input type="number" id="restSec" min="0" max="59" inputmode="numeric"> s
+          </div>
+        </div>
+
+        <div class="setting-item">
+          <label for="rounds">Počet kol</label>
+          <input type="number" id="rounds" min="1" max="99" class="number-input" inputmode="numeric">
+        </div>
+
+        <div class="preview">
+          <span class="preset-bar preset-bar--large" id="editorBar"></span>
+          <span id="editorTotal" class="preview-total">Celkem 00:00</span>
         </div>
       </div>
 
-      <div class="setting-item">
-        <label for="rounds">Počet opakování (kol)</label>
-        <input type="number" id="rounds" value="3" min="1" max="99" class="number-input" inputmode="numeric">
+      <div class="controls">
+        <button id="savePreset" class="btn btn-primary" type="button">Uložit</button>
+        <button id="cancelEdit" class="btn btn-secondary" type="button">Zrušit</button>
       </div>
 
-      <div class="settings-divider"></div>
+      <div class="text-actions">
+        <button id="duplicatePreset" class="text-btn" type="button" hidden>Duplikovat</button>
+        <button id="deletePreset" class="text-btn text-btn--danger" type="button" hidden>Smazat trénink</button>
+      </div>
+    </section>
 
+    <!-- ===== Hlas a zvuk ===== -->
+    <section id="viewSettings" class="view" hidden>
+      <header class="view-header">
+        <button id="backFromSettings" class="back-btn" type="button">‹ Tréninky</button>
+        <h1 class="title-small">Hlas a zvuk</h1>
+      </header>
+
+      <div class="settings-card">
       <!-- Hlasový odpočet -->
       <div class="setting-item">
         <label for="voiceEnabled">Hlasový odpočet</label>
@@ -127,7 +182,8 @@
 
         <button id="testVoice" class="btn btn-secondary btn-small" type="button">Vyzkoušet hlas</button>
       </div>
-    </div>
+      </div>
+    </section>
 
   </div>
 
