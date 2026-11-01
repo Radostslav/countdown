@@ -4,26 +4,24 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Workshop & Cvičební Minutka</title>
-  
+
   <!-- Podpora pro iOS Safari jako PWA (Web App) -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  
+
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
   <div class="app-container">
-    
+
     <!-- Vizuální Časovač (Kruh s ubývající výsečí) -->
     <div class="timer-display">
       <svg class="progress-ring" viewBox="0 0 100 100">
-        <!-- Pozadí kruhu -->
         <circle class="progress-ring__background" cx="50" cy="50" r="45" />
-        <!-- Ubývající barevný kruh -->
         <circle class="progress-ring__circle" id="progressCircle" cx="50" cy="50" r="45" />
       </svg>
-      
+
       <div class="timer-text-container">
         <span id="phaseLabel" class="phase-label">PŘIPRAVENO</span>
         <span id="timeDisplay" class="time-display">02:00</span>
@@ -40,26 +38,94 @@
     <!-- Nastavení parametrů -->
     <div class="settings-card">
       <h2>Nastavení</h2>
-      
+
       <div class="setting-item">
-        <label for="workTime">Aktivita / Práce (min:sek)</label>
+        <label for="workMin">Aktivita / Práce (min:sek)</label>
         <div class="time-inputs">
-          <input type="number" id="workMin" value="2" min="0" max="99"> m
-          <input type="number" id="workSec" value="0" min="0" max="59"> s
+          <input type="number" id="workMin" value="2" min="0" max="99" inputmode="numeric"> m
+          <input type="number" id="workSec" value="0" min="0" max="59" inputmode="numeric"> s
         </div>
       </div>
 
       <div class="setting-item">
-        <label for="restTime">Pauza / Mezera (min:sek)</label>
+        <label for="restMin">Pauza / Mezera (min:sek)</label>
         <div class="time-inputs">
-          <input type="number" id="restMin" value="0" min="0" max="99"> m
-          <input type="number" id="restSec" value="30" min="0" max="59"> s
+          <input type="number" id="restMin" value="0" min="0" max="99" inputmode="numeric"> m
+          <input type="number" id="restSec" value="30" min="0" max="59" inputmode="numeric"> s
         </div>
       </div>
 
       <div class="setting-item">
         <label for="rounds">Počet opakování (kol)</label>
-        <input type="number" id="rounds" value="3" min="1" max="99" class="number-input">
+        <input type="number" id="rounds" value="3" min="1" max="99" class="number-input" inputmode="numeric">
+      </div>
+
+      <div class="settings-divider"></div>
+
+      <!-- Hlasový odpočet -->
+      <div class="setting-item">
+        <label for="voiceEnabled">Hlasový odpočet</label>
+        <label class="switch">
+          <input type="checkbox" id="voiceEnabled">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div id="voiceOptions" class="voice-options" hidden>
+
+        <div class="setting-item">
+          <label for="voiceLang">Jazyk</label>
+          <select id="voiceLang">
+            <option value="cs">Čeština</option>
+            <option value="sk">Slovenčina</option>
+            <option value="en">English</option>
+            <option value="de">Deutsch</option>
+            <option value="pl">Polski</option>
+          </select>
+        </div>
+
+        <div class="setting-item">
+          <label for="voiceName">Hlas</label>
+          <select id="voiceName">
+            <option value="">Automaticky</option>
+          </select>
+        </div>
+
+        <p id="voiceHint" class="hint" hidden></p>
+
+        <div class="setting-item">
+          <label for="announceMode">Hlásit zbývající čas</label>
+          <select id="announceMode">
+            <option value="smart">Chytře</option>
+            <option value="60">Každou minutu</option>
+            <option value="30">Každých 30 s</option>
+            <option value="15">Každých 15 s</option>
+            <option value="none">Jen na konci</option>
+          </select>
+        </div>
+
+        <div class="setting-item">
+          <label for="finalLen">Závěrečný odpočet</label>
+          <select id="finalLen">
+            <option value="0">Vypnuto</option>
+            <option value="3">Poslední 3 s</option>
+            <option value="5">Posledních 5 s</option>
+            <option value="10" selected>Posledních 10 s</option>
+          </select>
+        </div>
+
+        <div class="setting-item">
+          <label for="finalStyle">Styl odpočtu</label>
+          <select id="finalStyle">
+            <option value="beep">Pípání</option>
+            <option value="mix" selected>Pípání + 3, 2, 1</option>
+            <option value="voice">Každá sekunda hlasem</option>
+          </select>
+        </div>
+
+        <p id="modeHint" class="hint"></p>
+
+        <button id="testVoice" class="btn btn-secondary btn-small" type="button">Vyzkoušet hlas</button>
       </div>
     </div>
 

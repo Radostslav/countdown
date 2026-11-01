@@ -14,7 +14,7 @@ body {
   justify-content: center;
   align-items: center;
   min-height: 100vh;
-  padding: 20px;
+  padding: max(20px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom));
 }
 
 .app-container {
@@ -73,6 +73,10 @@ body {
   margin-bottom: 4px;
 }
 
+.phase-label.is-work { color: #ef4444; }
+.phase-label.is-rest { color: #10b981; }
+.phase-label.is-done { color: #3b82f6; }
+
 .time-display {
   font-size: 3.2rem;
   font-weight: 800;
@@ -101,11 +105,16 @@ body {
   font-size: 1.1rem;
   font-weight: 600;
   cursor: pointer;
-  transition: opacity 0.2s, transform 0.1s;
+  transition: opacity 0.2s, transform 0.1s, background-color 0.2s;
 }
 
 .btn:active {
   transform: scale(0.97);
+}
+
+.btn:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
 }
 
 .btn-primary {
@@ -113,9 +122,22 @@ body {
   color: #ffffff;
 }
 
+.btn-warning {
+  background-color: #f59e0b;
+  color: #ffffff;
+}
+
 .btn-secondary {
   background-color: #334155;
   color: #cbd5e1;
+}
+
+.btn-small {
+  flex: none;
+  width: 100%;
+  padding: 12px;
+  font-size: 0.95rem;
+  border-radius: 10px;
 }
 
 /* Kartička nastavení */
@@ -137,11 +159,22 @@ body {
   letter-spacing: 1px;
 }
 
+.settings-divider {
+  height: 1px;
+  background-color: #334155;
+}
+
 .setting-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
   font-size: 0.95rem;
+}
+
+.setting-item > label:first-child {
+  flex: 1;
+  min-width: 0;
 }
 
 .time-inputs, .number-input {
@@ -161,11 +194,101 @@ input[type="number"] {
   font-size: 1rem;
 }
 
-input[type="number"]:focus {
+input[type="number"]:focus,
+select:focus {
   outline: 2px solid #3b82f6;
+}
+
+/* Rozbalovací výběr (16px písmo = iOS nezoomuje) */
+select {
+  -webkit-appearance: none;
+  appearance: none;
+  background-color: #0f172a;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  border: 1px solid #334155;
+  color: #fff;
+  padding: 8px 30px 8px 10px;
+  border-radius: 8px;
+  font-size: 1rem;
+  max-width: 175px;
+  text-overflow: ellipsis;
+}
+
+/* Přepínač (switch) */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 30px;
+  flex-shrink: 0;
+}
+
+.switch input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  inset: 0;
+  background-color: #334155;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.slider::before {
+  content: "";
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  left: 3px;
+  top: 3px;
+  background-color: #fff;
+  border-radius: 50%;
+  transition: transform 0.2s;
+}
+
+.switch input:checked + .slider {
+  background-color: #10b981;
+}
+
+.switch input:checked + .slider::before {
+  transform: translateX(20px);
+}
+
+.switch input:focus-visible + .slider {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Volby hlasu */
+.voice-options {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.voice-options[hidden],
+.hint[hidden] {
+  display: none;
+}
+
+.hint {
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: #94a3b8;
 }
 
 /* Barva pro fázi pauzy */
 .mode-rest {
   stroke: #10b981 !important; /* Zelená pauza */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progress-ring__circle, .slider, .slider::before, .btn { transition: none; }
 }
