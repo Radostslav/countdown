@@ -49,32 +49,62 @@ let timeRemaining = 120;
 // ===== Zvuk – jeden sdílený AudioContext =====
 // (nový kontext pro každé pípnutí iOS po pár kusech zablokuje)
 let audioCtx = null;
+let silentAudio = null;
+
+// Tiché zvukové „lešení": na starších iOS přepne zvuk do režimu přehrávání,
+// takže pípání nevypne přepínač tichého režimu
+const SILENT_WAV = 'data:audio/wav;base64,UklGRvQHAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YdAHAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgA==';
 
 function unlockAudio() {
   try {
+    // iOS 17+: přehrávat i při zapnutém tichém režimu
+    if (navigator.audioSession) navigator.audioSession.type = 'playback';
+    else {
+      if (!silentAudio) {
+        silentAudio = new Audio(SILENT_WAV);
+        silentAudio.loop = true;
+        silentAudio.setAttribute('playsinline', '');
+      }
+      silentAudio.play().catch(() => {});
+    }
+
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    if (audioCtx.state === 'suspended') audioCtx.resume();
+    if (audioCtx.state !== 'running') audioCtx.resume().catch(() => {});
   } catch (e) {
     console.log('Audio not supported or blocked');
   }
 }
 
-function playBeep(freq = 600, duration = 0.2, volume = 0.4) {
-  if (!audioCtx) return;
+function stopSilentAudio() {
+  if (silentAudio) silentAudio.pause();
+}
+
+function playTone(freq, duration, volume) {
   try {
     const t = audioCtx.currentTime;
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
-    osc.type = 'sine';
+    osc.type = 'triangle'; // na malém reproduktoru telefonu je slyšet lépe než čistý sinus
     osc.frequency.value = freq;
     gain.gain.setValueAtTime(0.0001, t);
     gain.gain.exponentialRampToValueAtTime(volume, t + 0.01);
+    gain.gain.setValueAtTime(volume, t + duration * 0.6);
     gain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
     osc.connect(gain);
     gain.connect(audioCtx.destination);
     osc.start(t);
     osc.stop(t + duration + 0.02);
   } catch (e) { /* nic */ }
+}
+
+function playBeep(freq = 600, duration = 0.2, volume = 0.8) {
+  if (!audioCtx) return;
+  // iOS po přehrání řeči často přepne AudioContext do stavu „interrupted" → probudit
+  if (audioCtx.state !== 'running') {
+    audioCtx.resume().then(() => playTone(freq, duration, volume)).catch(() => {});
+    return;
+  }
+  playTone(freq, duration, volume);
 }
 
 // ===== Jazyky a fráze =====
@@ -286,7 +316,7 @@ function voiceCue(remaining) {
       speak(String(remaining));             // „3… 2… 1…"
     } else {
       const last = remaining <= 3;
-      playBeep(last ? 880 : 660, 0.12, last ? 0.5 : 0.3); // poslední 3 s vyšší a hlasitější
+      playBeep(last ? 1050 : 800, last ? 0.18 : 0.12, last ? 1 : 0.7); // poslední 3 s vyšší a hlasitější
     }
     return;
   }
@@ -396,8 +426,9 @@ function finish(silent) {
   setStartBtn('start');
   setPhaseLabel('HOTOVO!', 'done');
   releaseWakeLock();
+  stopSilentAudio();
   if (!silent) {
-    playBeep(1000, 0.8, 0.5);
+    playBeep(1000, 0.8, 1);
     speak(lang().done);
   }
 }
@@ -414,10 +445,10 @@ function tick(silent = false) {
 
   // Konec fáze → hned přepnout na další (bez „visící" nuly)
   if (currentMode === 'WORK' && restDuration > 0 && currentRound < totalRounds) {
-    if (!silent) playBeep(800, 0.4);
+    if (!silent) playBeep(800, 0.4, 1);
     enterPhase('REST', !silent);
   } else if (currentRound < totalRounds) {
-    if (!silent) playBeep(800, 0.4);
+    if (!silent) playBeep(800, 0.4, 1);
     currentRound++;
     enterPhase('WORK', !silent);
   } else {
@@ -452,6 +483,7 @@ function resetTimer() {
   hasStarted = false;
   isFinished = false;
   releaseWakeLock();
+  stopSilentAudio();
   if ('speechSynthesis' in window) speechSynthesis.cancel();
 
   setStartBtn('start');
@@ -519,6 +551,7 @@ startBtn.addEventListener('click', () => {
     isRunning = false;
     setStartBtn('resume');
     releaseWakeLock();
+    stopSilentAudio();
     if ('speechSynthesis' in window) speechSynthesis.cancel();
     return;
   }
@@ -570,7 +603,9 @@ voiceLangSelect.addEventListener('change', () => {
 testVoiceBtn.addEventListener('click', () => {
   unlockAudio();
   unlockSpeech();
-  speak(leftText(90));
+  playBeep(800, 0.12, 0.7);
+  setTimeout(() => playBeep(1050, 0.18, 1), 500);
+  setTimeout(() => speak(leftText(90)), 1000);
 });
 
 // ===== Inicializace =====
